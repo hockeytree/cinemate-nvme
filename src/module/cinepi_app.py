@@ -61,25 +61,31 @@ class CinePi:
     def get_default_args(self):
         sensor_mode = self.redis_controller.get_value('sensor_mode')
         if sensor_mode is None:
-            # Default to 0 if no value is retrieved
             sensor_mode = '0'
         else:
             sensor_mode = int(sensor_mode)
-            
+
         self.sensor_detect.detect_camera_model()
         sensor_model = self.sensor_detect.camera_model
         tuning_file_path = f'/home/pi/libcamera/src/ipa/rpi/pisp/data/{sensor_model}.json'
-        
+
         cg_rb = self.redis_controller.get_value('cg_rb')
         if cg_rb is None:
-            cg_rb = '2.5,2.2'  # imx477 default for 3200K
+            cg_rb = '2.5,2.2'  # Default for imx477 at 3200K
+
+        # Get full resolution
+        full_width = self.sensor_detect.get_width(sensor_model, sensor_mode)
+        full_height = self.sensor_detect.get_height(sensor_model, sensor_mode)
+
+        # Calculate lores resolution dynamically
+        lores_width, lores_height = self.calculate_lores_resolution(full_width, full_height)
 
         args = [
-            '--mode', f"{self.sensor_detect.get_width(sensor_model, sensor_mode)}:{self.sensor_detect.get_height(sensor_model, sensor_mode)}:{self.sensor_detect.get_bit_depth(sensor_model, sensor_mode)}:{self.sensor_detect.get_packing(sensor_model, sensor_mode)}",
-            '--width', f"{self.sensor_detect.get_width(sensor_model, sensor_mode)}",
-            '--height', f"{self.sensor_detect.get_height(sensor_model, sensor_mode)}",
-            '--lores-width', '1280',
-            '--lores-height', '720',
+            '--mode', f"{full_width}:{full_height}:{self.sensor_detect.get_bit_depth(sensor_model, sensor_mode)}:{self.sensor_detect.get_packing(sensor_model, sensor_mode)}",
+            '--width', f"{full_width}",
+            '--height', f"{full_height}",
+            '--lores-width', f"{lores_width}",
+            '--lores-height', f"{lores_height}",
             '-p', '0,30,1920,1020',
             '--post-process-file', '/home/pi/post-processing.json',
             '--shutter', '20000',
@@ -91,6 +97,22 @@ class CinePi:
             args.extend(['--tuning-file', tuning_file_path])
 
         return args
+    
+    def calculate_lores_resolution(self, full_width, full_height, max_width=1280, max_height=720):
+        """Calculates lores resolution while maintaining aspect ratio, constrained by max width and height."""
+        aspect_ratio = full_width / full_height
+
+        # First, scale based on width
+        lores_width = min(full_width, max_width)
+        lores_height = int(lores_width / aspect_ratio)
+
+        # If height exceeds max_height after width-based scaling, re-scale based on height
+        if lores_height > max_height:
+            lores_height = max_height
+            lores_width = int(lores_height * aspect_ratio)
+
+        return lores_width, lores_height
+
 
     def start_cinepi_process(self, cinepi_args=None):
         if cinepi_args is None:

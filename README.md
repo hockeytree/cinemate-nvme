@@ -228,10 +228,10 @@ Default settings are `None`. Map Grove Base HAT ADC channels to iso, shutter ang
 
 ```
   "analog_controls": {
-    "iso_pot": "A0",
-    "shutter_a_pot": "A2",
-    "fps_pot": "A4",
-    "wb_pot": "A6"
+    "iso_pot": "0",
+    "shutter_a_pot": "2",
+    "fps_pot": "4",
+    "wb_pot": "6"
   }
 ```
 

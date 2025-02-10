@@ -94,6 +94,11 @@ class RedisListener:
                         sensor_timestamp = stats_data.get('sensorTimestamp', None)
                         self.current_framerate = stats_data.get('framerate', None)
                         
+                        if self.current_framerate is not None:
+                            self.current_framerate = self.current_framerate * 1000
+                        else:
+                            self.current_framerate = 0  # or some default value
+                        
                         self.current_framerate = self.current_framerate * 1000
                         
                         if color_temp:

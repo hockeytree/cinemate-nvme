@@ -1,34 +1,34 @@
-import smbus
-import RPi.GPIO as GPIO
+#import smbus
+#import RPi.GPIO as GPIO
 import time
 import os
-import psutil
+#import psutil
 import subprocess
 import re
 
-i2c_ch = 1
-i2c_address = 0x34
-bus = smbus.SMBus(i2c_ch)
+#i2c_ch = 1
+#i2c_address = 0x34
+#bus = smbus.SMBus(i2c_ch)
 
 mounted = 0
-lastReadCount = 0
-lastWriteCount = 0
+#lastReadCount = 0
+#lastWriteCount = 0
 
 device_node = None
 
-def readButtons():
-    while 1:
-        data = bus.read_byte(i2c_address)
-        if data != 0x69:
-            break
-        time.sleep(0.1)
-    eject_button = (data & 0x02 == 0x02)
-    insert_button = (data & 0x01 == 0x01)
-    return (insert_button,eject_button)
+#def readButtons():
+#    while 1:
+#        data = bus.read_byte(i2c_address)
+#        if data != 0x69:
+#            break
+#        time.sleep(0.1)
+#    eject_button = (data & 0x02 == 0x02)
+#    insert_button = (data & 0x01 == 0x01)
+#    return (insert_button,eject_button)
 
 
-def writeLED(data):
-    bus.write_byte(i2c_address,data)
+#def writeLED(data):
+#    bus.write_byte(i2c_address,data)
 
 def check_for_device(device_name):
     try:
@@ -110,8 +110,8 @@ def unmountPCIe():
     print("NVMe Device found:%s" % NVMe_port)
     if NVMe_port != None:
         os.system("sudo bash -c 'echo 1 >/sys/bus/pci/devices/"+NVMe_port+"/remove'") #os.system("sudo bash -c 'echo fd500000.pcie > /sys/bus/platform/drivers/brcm-pcie/unbind'")
-    writeLED(False)
-    mounted = 0
+    #writeLED(False)
+    mounted = 4
     device_node = None
 
 def mountPCIe():
@@ -120,8 +120,9 @@ def mountPCIe():
     print("Mounting PCIe device")
     time.sleep(0.5)
     if os.path.exists('/sys/devices/platform/axi/1000110000.pcie/driver'):
-        print("1000110000.pcie driver exists, try rescan")
-        os.system("sudo bash -c 'echo 1 >/sys/bus/pci/rescan'")
+        #print("1000110000.pcie driver exists, try rescan")
+        #os.system("sudo bash -c 'echo 1 >/sys/bus/pci/rescan'")
+        mounted = 3
     else:
         print("1000110000.pcie driver has not loaded, binding the driver")
         os.system("sudo bash -c 'echo 1000110000.pcie > /sys/bus/platform/drivers/brcm-pcie/bind'")
@@ -133,27 +134,52 @@ def mountPCIe():
     # Mount the NVMe drive if it's found
     if device_node:
         mount_last_partition(device_node)
-        writeLED(True)
+    #    writeLED(True)
         mounted = 1
 
-last_insert_button = 0
-last_eject_button = 0
+def remountPCIe():
+    global mounted
+    global device_node
+    print("Mounting PCIe device")
+    time.sleep(0.5)
+    if os.path.exists('/sys/devices/platform/axi/1000110000.pcie/driver'):
+        print("1000110000.pcie driver exists, try rescan")
+        #os.system("sudo bash -c 'echo 1 >/sys/bus/pci/rescan'")
+        mounted = 5
+    else:
+        print("1000110000.pcie driver has not loaded, binding the driver")
+        os.system("sudo bash -c 'echo 1000110000.pcie > /sys/bus/platform/drivers/brcm-pcie/bind'")
+    
+    time.sleep(0.5)
+    # Check if the device is mounted
+    device_node = check_for_device("Non-Volatile memory controller")
 
-(insert_button,eject_button) = readButtons()
-if insert_button == 0 and mounted == 0:
-    mountPCIe()
-last_insert_button = insert_button
-last_eject_button = eject_button
+    # Mount the NVMe drive if it's found
+    if device_node:
+        mount_last_partition(device_node)
+    #    writeLED(True)
+        mounted = 1
+
+#last_insert_button = 0
+#last_eject_button = 0
+
+#(insert_button,eject_button) = readButtons()
+#if insert_button == 0 and mounted == 0:
+#    mountPCIe()
+#last_insert_button = insert_button
+#last_eject_button = eject_button
 
 try:
     while True:
-        (insert_button,eject_button) = readButtons()
-        #print((insert_button,eject_button),(last_insert_button,last_eject_button))
-        if last_insert_button == 1 and insert_button == 0 and mounted == 0:
+        if mounted == 0:
             mountPCIe()
-        if last_eject_button == 1 and eject_button == 0:
+        if mounted == 4:
+            remountPCIe()
+        if mounted == 3:
             unmountPCIe()
-        (last_insert_button,last_eject_button) = (insert_button,eject_button)
+        if mounted == 5:
+            print("Unable to Mount NVME Drive, cancelling")
+            mounted = 1
         time.sleep(0.1)
 
 finally:

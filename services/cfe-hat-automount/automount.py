@@ -180,6 +180,7 @@ try:
         if mounted == 5:
             print("Unable to Mount NVME Drive, cancelling")
             mounted = 1
+            time.sleep(1)
         time.sleep(0.1)
 
 finally:
